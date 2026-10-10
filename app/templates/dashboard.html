@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ilmeva | Yönetici Paneli</title>
+
+  <style>
+    :root {
+      --plum: #432d45;
+      --paper: #f7f3ef;
+      --ink: #27232b;
+      --muted: #655d69;
+      --border: #ded5df;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    header, main {
+      max-width: 1200px;
+      margin: auto;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    a { color: var(--plum); }
+
+    .brand {
+      font-family: Georgia, serif;
+      font-size: 32px;
+      letter-spacing: 2px;
+      text-decoration: none;
+    }
+
+    .heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    h1 { margin: 0; font-size: 32px; }
+    p { color: var(--muted); }
+
+    .summary {
+      background: var(--plum);
+      color: white;
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .summary p { color: #e9dfea; margin: 0; }
+    .summary strong { display: block; font-size: 36px; }
+
+    button, input { font: inherit; }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      background: var(--plum);
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: .55; cursor: wait; }
+
+    input {
+      width: 100%;
+      max-width: 440px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-top: 8px;
+    }
+
+    button:focus-visible, input:focus, a:focus-visible {
+      outline: 3px solid #c5b4cc;
+      outline-offset: 2px;
+    }
+
+    label { display: block; }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-top: 16px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 840px;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: #eee7ef;
+      color: var(--plum);
+      padding: 16px;
+      font-size: 13px;
+    }
+
+    td {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+      max-width: 240px;
+    }
+
+    .message-cell { white-space: pre-wrap; }
+    .small { font-size: 12px; color: var(--muted); }
+    #status { min-height: 24px; }
+    #empty { padding: 24px; text-align: center; }
+
+    @media (max-width: 640px) {
+      header, main { padding: 16px; }
+      .heading { align-items: flex-start; flex-direction: column; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='brand.css') }}"></head>
+
+<body>
+  <header>
+    <a class="brand" href="/">ILMEVA</a>
+    <a href="/">Asistan sayfasına dön</a>
+  </header>
+
+  <main>
+    <div class="heading">
+      <div>
+        <h1>İletişim talepleri</h1>
+        <p>Ziyaretçilerin form üzerinden bıraktığı talepler.</p>
+      </div>
+      <button id="refresh" type="button">Listeyi yenile</button>
+    </div>
+
+    <section class="summary" aria-label="Talep özeti">
+      <p>Toplam kayıt</p>
+      <strong id="count">—</strong>
+    </section>
+
+    <label for="search">Kayıtlarda ara</label>
+    <input id="search" type="search"
+           placeholder="İsim, telefon, e-posta veya mesaj">
+
+    <p id="status" role="status" aria-live="polite"></p>
+    <p id="updated" class="small"></p>
+
+    <div class="table-wrap">
+      <table aria-label="İletişim talepleri">
+        <thead>
+          <tr>
+            <th scope="col">Kayıt</th>
+            <th scope="col">Ad soyad</th>
+            <th scope="col">Telefon</th>
+            <th scope="col">E-posta</th>
+            <th scope="col">Mesaj</th>
+            <th scope="col">Tarih</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p id="empty" hidden></p>
+    </div>
+
+    <p class="small">
+      Tarihler Türkiye saatine göre gösterilir.
+      Yeni form gönderimlerinden sonra “Listeyi yenile” düğmesine basın.
+    </p>
+    <p class="small">
+      Bu alan yönetici girişiyle korunur. Tarayıcı giriş bilgilerini
+      geçici olarak hatırlayabilir. Paylaşılan bir bilgisayarda
+      gizli pencere kullanın ve işiniz bitince tüm gizli pencereleri kapatın.
+    </p>
+  </main>
+
+  <script>
+    const rows = document.getElementById("rows");
+    const count = document.getElementById("count");
+    const status = document.getElementById("status");
+    const updated = document.getElementById("updated");
+    const empty = document.getElementById("empty");
+    const search = document.getElementById("search");
+    const refresh = document.getElementById("refresh");
+
+    let records = [];
+    let loaded = false;
+
+    function formatDate(value) {
+      if (!value) return "—";
+
+      // SQLite CURRENT_TIMESTAMP değeri UTC olarak kaydedilir.
+      const date = new Date(value.replace(" ", "T") + "Z");
+      if (Number.isNaN(date.getTime())) return "—";
+
+      return date.toLocaleString("tr-TR", {
+        timeZone: "Europe/Istanbul",
+        dateStyle: "short",
+        timeStyle: "short"
+      });
+    }
+
+    function renderRows() {
+      rows.replaceChildren();
+      empty.hidden = true;
+      if (!loaded) return;
+
+      const query = search.value.trim().toLocaleLowerCase("tr-TR");
+      const visible = records.filter(record => {
+        const text = [
+          record.isim,
+          record.telefon,
+          record.email,
+          record.mesaj
+        ].join(" ").toLocaleLowerCase("tr-TR");
+
+        return text.includes(query);
+      });
+
+      for (const record of visible) {
+        const row = document.createElement("tr");
+        const values = [
+          record.id,
+          record.isim,
+          record.telefon,
+          record.email || "—",
+          record.mesaj || "—",
+          formatDate(record.tarih)
+        ];
+
+        values.forEach((value, index) => {
+          const cell = document.createElement("td");
+          // Formdan gelen bilgiler HTML olarak çalıştırılmaz.
+          cell.textContent = String(value);
+          if (index === 4) cell.className = "message-cell";
+          row.appendChild(cell);
+        });
+
+        rows.appendChild(row);
+      }
+
+      empty.hidden = visible.length !== 0;
+      empty.textContent = records.length === 0
+        ? "Henüz iletişim talebi yok."
+        : "Aramanızla eşleşen kayıt bulunamadı.";
+    }
+
+    async function loadRecords() {
+      if (refresh.disabled) return;
+
+      refresh.disabled = true;
+      status.textContent = "Kayıtlar yükleniyor…";
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35000);
+
+      try {
+        const response = await fetch("/api/leads", {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        if (response.status === 401) {
+          throw new Error("Yönetici girişi gerekiyor. Sayfayı yeniden açın.");
+        }
+
+        const data = await response.json();
+
+        if (!response.ok || data.basari !== true) {
+          throw new Error(data.hata || "Kayıtlar alınamadı.");
+        }
+
+        if (!Array.isArray(data.leadler)) {
+          throw new Error("Kayıt listesi beklenen biçimde değil.");
+        }
+
+        records = data.leadler;
+        loaded = true;
+        count.textContent = records.length;
+        renderRows();
+        status.textContent = "Kayıtlar güncel.";
+        updated.textContent = "Son yenileme: " +
+          new Date().toLocaleTimeString("tr-TR", {
+            timeZone: "Europe/Istanbul"
+          });
+      } catch (error) {
+        records = [];
+        loaded = false;
+        rows.replaceChildren();
+        empty.hidden = true;
+        count.textContent = "—";
+        updated.textContent = "";
+
+        status.textContent = error.name === "AbortError"
+          ? "Yanıt bekleme süresi doldu. Listeyi yeniden yükleyin."
+          : (error instanceof TypeError || error instanceof SyntaxError)
+            ? "Sunucuya ulaşılamadı veya yanıt okunamadı."
+            : error.message;
+      } finally {
+        clearTimeout(timer);
+        refresh.disabled = false;
+      }
+    }
+
+    search.addEventListener("input", renderRows);
+    refresh.addEventListener("click", loadRecords);
+    loadRecords();
+  </script>
+</body>
+</html>

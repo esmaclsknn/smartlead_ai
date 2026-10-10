@@ -1,2 +1,26 @@
 .env
 venv/
+# Gizli ayarlar
+.env
+.env.*
+!.env.example
+
+# Python çalışma ortamları
+venv/
+.venv/
+
+# Python geçici dosyaları
+__pycache__/
+*.py[cod]
+
+# Yerel veritabanı ve kayıtlar
+instance/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.log
+
+# macOS
+.DS_Store
