@@ -78,7 +78,7 @@ API anahtarı boş bırakılırsa uygulama, yapay zekâ bağlantısının kurulm
 python setup_admin.py
 ```
 
-Kullanıcı adını ve en az 12 karakterlik parolanı belirle. Parola yazılırken Terminal'de karakter görünmez.
+Yönetici kullanıcı adı esma olarak ayarlanır. En az 12 karakterlik bir parola belirle.
 
 Kurulum, yönetici parolasının özetini ve gerekli gizli ayarları .env dosyasına kaydeder.
 
@@ -169,11 +169,13 @@ Bunlar geliştirme sırasında yapılan kontrollerdir; kapsamlı bir otomatik te
 
 ## Mevcut durum
 
-Uygulama yerel ortamda çalışmaktadır. Render yayını ve Wix Studio entegrasyonu henüz tamamlanmamıştır.
+Uygulama yerel ortamda çalıştırılmış ve Render üzerinde yayımlanmıştır.
 
-Planlanan kullanımda chatbot sayfası Wix Studio içine gömülecek, yönetici paneli ise site başlığındaki bir bağlantıdan ayrı sekmede açılacaktır. Panel bağlantısının görünür olması, yönetici doğrulamasını kaldırmaz.
+Canlı uygulama: https://ilmeva-asistan.onrender.com/
 
-Yayınlama aşamasında ortam değişkenleri, HTTPS, kalıcı veritabanı saklama ve istek sınırlandırması ayrıca ele alınacaktır. Canlı adresler, yayın ve kontroller tamamlandıktan sonra bu belgeye eklenecektir.
+Wix Studio entegrasyonu ofis aşamasında tamamlanacaktır. Chatbot sayfasının siteye gömülmesi, yönetici panelinin ise site başlığındaki bir bağlantıdan ayrı sekmede açılması planlanmaktadır. Yönetici paneli kullanıcı adı ve parola ile korunmaktadır.
+
+Kalıcı veritabanı saklama ve istek sınırlandırması, gerçek kullanıcılarla kullanıma geçmeden önce tamamlanacak geliştirmeler arasındadır.
 
 ## Sınırlar
 
