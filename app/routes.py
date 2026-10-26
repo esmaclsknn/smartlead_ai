@@ -230,13 +230,6 @@ def lead_kaydet():
 @api.route("/leads", methods=["GET"])
 def lead_listesi():
 
-    # Öncelikle yönetici girişini doğrula.
-
-    kontrol = yonetici_kontrol()
-
-    if kontrol is not None:
-        return kontrol
-
     try:
 
         leadler = tum_leadler()
