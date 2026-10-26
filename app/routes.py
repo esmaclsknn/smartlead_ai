@@ -2,30 +2,114 @@
 import re
 import sqlite3
 
+from functools import wraps
+from hmac import compare_digest
+
 from flask import (
     Blueprint,
+    current_app,
     jsonify,
     render_template,
     request,
 )
 
+from werkzeug.security import check_password_hash
+
 from app.database import lead_ekle, tum_leadler
 from app.services.ai_service import ai_service, AIServiceError
 
+
+# BLUEPRINT TANIMLARI
 
 pages = Blueprint("pages", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
 
 
+# HATA YANITI
+
 def hata_yaniti(mesaj, durum):
-    """Hataları tutarlı bir JSON biçiminde döndürür."""
-    return jsonify(basari=False, hata=mesaj), durum
+    """Hataları standart JSON biçiminde döndürür."""
+
+    return jsonify(
+        basari=False,
+        hata=mesaj
+    ), durum
+
+
+# YÖNETİCİ KİMLİK DOĞRULAMA
+
+def yonetici_kontrol():
+    """
+    Yönetici kullanıcı adını ve parola özetini
+    Flask yapılandırmasından alır.
+    """
+
+    kullanici = current_app.config.get(
+        "ADMIN_USERNAME", ""
+    )
+
+    parola_ozeti = current_app.config.get(
+        "ADMIN_PASSWORD_HASH", ""
+    )
+
+    # Güvenlik ayarları eksikse erişimi engelle.
+    if not kullanici or not parola_ozeti:
+
+        current_app.logger.error(
+            "Ilmeva yönetici yapılandırması eksik."
+        )
+
+        return hata_yaniti(
+            "Yönetici sistemi yapılandırılmamış.",
+            503
+        )
+
+    auth = request.authorization
+
+    yetkili = False
+
+    if (
+        auth is not None
+        and (auth.type or "").lower() == "basic"
+        and isinstance(auth.username, str)
+        and isinstance(auth.password, str)
+    ):
+
+        kullanici_dogru = compare_digest(
+            auth.username,
+            kullanici
+        )
+
+        parola_dogru = check_password_hash(
+            parola_ozeti,
+            auth.password
+        )
+
+        yetkili = kullanici_dogru and parola_dogru
+
+    if not yetkili:
+
+        yanit = jsonify(
+            basari=False,
+            hata="Yönetici girişi gerekli."
+        )
+
+        yanit.status_code = 401
+
+        yanit.headers["WWW-Authenticate"] = (
+            'Basic realm="Ilmeva Yonetim"'
+        )
+
+        return yanit
+
+    return None
 
 
 # ANA SAYFA
 
 @pages.route("/", methods=["GET"])
 def ana_sayfa():
+
     return render_template("index.html")
 
 
@@ -33,6 +117,12 @@ def ana_sayfa():
 
 @pages.route("/dashboard", methods=["GET"])
 def dashboard():
+
+    kontrol = yonetici_kontrol()
+
+    if kontrol is not None:
+        return kontrol
+
     return render_template("dashboard.html")
 
 
@@ -40,19 +130,22 @@ def dashboard():
 
 @pages.route("/health", methods=["GET"])
 def health():
+
     return jsonify(
         basari=True,
         durum="calisiyor"
-    )
+    ), 200
 
 
 # CHATBOT
 
 @api.route("/sohbet", methods=["POST"])
 def sohbet():
+
     veri = request.get_json(silent=True)
 
     if not isinstance(veri, dict):
+
         return hata_yaniti(
             "Geçerli bir JSON mesajı gönderin.",
             400
@@ -61,18 +154,32 @@ def sohbet():
     mesaj = veri.get("mesaj")
 
     try:
+
         cevap = ai_service.yanit_uret(mesaj)
 
         return jsonify(
             basari=True,
             cevap=cevap
-        )
+        ), 200
 
     except ValueError as hata:
-        return hata_yaniti(str(hata), 400)
+
+        return hata_yaniti(
+            str(hata),
+            400
+        )
 
     except AIServiceError as hata:
-        return hata_yaniti(str(hata), 503)
+
+        current_app.logger.warning(
+            "Ilmeva AI servis hatası: %s",
+            hata
+        )
+
+        return hata_yaniti(
+            "Asistan şu anda yanıt veremiyor.",
+            503
+        )
 
 
 # İLETİŞİM FORMU - KAYIT EKLEME
@@ -83,6 +190,7 @@ def lead_kaydet():
     veri = request.get_json(silent=True)
 
     if not isinstance(veri, dict):
+
         return hata_yaniti(
             "Geçerli bir JSON formu gönderin.",
             400
@@ -102,6 +210,7 @@ def lead_kaydet():
         deger = veri.get(alan, "")
 
         if not isinstance(deger, str):
+
             return hata_yaniti(
                 f"{alan} alanı metin olmalıdır.",
                 400
@@ -110,6 +219,7 @@ def lead_kaydet():
         deger = deger.strip()
 
         if len(deger) > sinir:
+
             return hata_yaniti(
                 f"{alan} alanı en fazla {sinir} karakter olabilir.",
                 400
@@ -117,11 +227,16 @@ def lead_kaydet():
 
         alanlar[alan] = deger
 
+    # Zorunlu alanlar
+
     if not alanlar["isim"] or not alanlar["telefon"]:
+
         return hata_yaniti(
             "İsim ve telefon alanlarını doldurun.",
             400
         )
+
+    # Telefon doğrulama
 
     telefon = alanlar["telefon"]
 
@@ -135,10 +250,13 @@ def lead_kaydet():
         not re.fullmatch(r"\+?[0-9 ()-]+", telefon)
         or not 7 <= len(rakamlar) <= 15
     ):
+
         return hata_yaniti(
             "Geçerli bir telefon numarası yazın.",
             400
         )
+
+    # E-posta doğrulama
 
     email = alanlar["email"]
 
@@ -146,10 +264,13 @@ def lead_kaydet():
         r"[^@\s]+@[^@\s]+\.[^@\s]+",
         email
     ):
+
         return hata_yaniti(
             "E-posta adresini kontrol edin.",
             400
         )
+
+    # Veritabanına kaydetme
 
     try:
 
@@ -167,6 +288,11 @@ def lead_kaydet():
         ), 201
 
     except sqlite3.Error:
+
+        current_app.logger.exception(
+            "Ilmeva kayıt oluşturma hatası."
+        )
+
         return hata_yaniti(
             "Talebiniz kaydedilemedi. Lütfen tekrar deneyin.",
             503
@@ -178,9 +304,21 @@ def lead_kaydet():
 @api.route("/leads", methods=["GET"])
 def lead_listesi():
 
+    # Öncelikle yönetici girişini doğrula.
+
+    kontrol = yonetici_kontrol()
+
+    if kontrol is not None:
+        return kontrol
+
     try:
 
         leadler = tum_leadler()
+
+        current_app.logger.info(
+            "Ilmeva yönetim paneli: %s kayıt getirildi.",
+            len(leadler)
+        )
 
         return jsonify(
             basari=True,
@@ -188,6 +326,11 @@ def lead_listesi():
         ), 200
 
     except sqlite3.Error:
+
+        current_app.logger.exception(
+            "Ilmeva kayıt listeleme hatası."
+        )
+
         return hata_yaniti(
             "Kayıtlar şu anda getirilemiyor.",
             503
@@ -200,6 +343,12 @@ def lead_listesi():
 @api.after_request
 def onbellegi_kapat(yanit):
 
-    yanit.headers["Cache-Control"] = "no-store"
+    yanit.headers["Cache-Control"] = (
+        "no-store, no-cache, must-revalidate, private"
+    )
+
+    yanit.headers["Pragma"] = "no-cache"
+
+    yanit.headers["Expires"] = "0"
 
     return yanit
