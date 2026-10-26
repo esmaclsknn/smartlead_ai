@@ -49,11 +49,6 @@ def ana_sayfa():
 @pages.route("/dashboard", methods=["GET"])
 def dashboard():
 
-    kontrol = yonetici_kontrol()
-
-    if kontrol is not None:
-        return kontrol
-
     return render_template("dashboard.html")
 
 
